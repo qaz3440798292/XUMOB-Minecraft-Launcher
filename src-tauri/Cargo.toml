@@ -1,0 +1,52 @@
+[package]
+name = "blockfield-launcher"
+version = "0.5.0"
+edition = "2021"
+default-run = "blockfield-launcher"
+
+[features]
+default = []
+custom-protocol = ["tauri/custom-protocol"]
+
+[lib]
+name = "blockfield_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "blockfield-launcher"
+path = "src/main.rs"
+
+[[bin]]
+name = "core-probe"
+path = "src/bin/core-probe.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.3", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+regex = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+md-5 = "0.10"
+hex = "0.4"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+encoding_rs = "0.8"
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "stream", "json"] }
+rfd = { version = "0.15", default-features = false, features = ["common-controls-v6"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "=0.39.1"
+windows-core = "0.62"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
