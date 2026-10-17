@@ -2,10 +2,13 @@
 node_modules/
 dist/
 .vite/
+.tools/
 
 # Rust / Tauri
 target/
 src-tauri/target/
+src-tauri/gen/
+data/
 
 # Environment variables and secrets
 .env
@@ -24,3 +27,6 @@ src-tauri/target/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local encrypted credentials
+*.bin

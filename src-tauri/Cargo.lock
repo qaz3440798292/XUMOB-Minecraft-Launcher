@@ -289,30 +289,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blockfield-launcher"
-version = "0.5.0"
-dependencies = [
- "chrono",
- "encoding_rs",
- "hex",
- "md-5",
- "regex",
- "reqwest 0.12.28",
- "rfd",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "sysinfo",
- "tauri",
- "tauri-build",
- "tauri-plugin-single-instance",
- "webview2-com",
- "windows-core 0.62.2",
- "zip",
-]
-
-[[package]]
 name = "blocking"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5181,6 +5157,34 @@ dependencies = [
  "libc",
  "once_cell",
  "pkg-config",
+]
+
+[[package]]
+name = "xumob-minecraft-launcher"
+version = "0.7.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "encoding_rs",
+ "flate2",
+ "hex",
+ "md-5",
+ "regex",
+ "reqwest 0.12.28",
+ "rfd",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "sysinfo",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-single-instance",
+ "webview2-com",
+ "windows 0.62.2",
+ "windows-core 0.62.2",
+ "windows-future 0.3.2",
+ "zip",
 ]
 
 [[package]]

@@ -1,0 +1,7 @@
+Monocraft font
+Source: https://github.com/IdreesInc/Monocraft
+Revision: e498bf70aeb25b4bdcff1e44d878fb2cb4f7c2a9
+License: SIL Open Font License 1.1 (see Monocraft-OFL.txt)
+
+The font is an independent, Minecraft-inspired typeface and is not affiliated
+with Mojang or Microsoft. The launcher uses it only for server MOTD text.

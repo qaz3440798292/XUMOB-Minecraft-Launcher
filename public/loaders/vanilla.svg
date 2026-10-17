@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 原版 Minecraft 的草方块标识：自绘像素风矢量，来源与说明见 public/loaders/ATTRIBUTION.md -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 4 16 16" shape-rendering="crispEdges" role="img" aria-label="原版 Minecraft">
+
+  <path
+    fill="#8bbf5b"
+    d="M11 4h2v1h-2zM9 5h6v1h-6zM7 6h10v1h-10zM5 7h14v1h-14zM5 8h14v1h-14zM7 9h10v1h-10zM9 10h6v1h-6zM11 11h2v1h-2z" />
+
+  <path
+    fill="#669140"
+    d="M4 8h1v1h-1zM4 9h3v1h-3zM5 10h4v1h-4zM7 11h4v1h-4zM9 12h3v1h-3zM11 13h1v1h-1z" />
+
+  <path
+    fill="#547b32"
+    d="M19 8h1v1h-1zM17 9h3v1h-3zM15 10h4v1h-4zM13 11h4v1h-4zM12 12h3v1h-3zM12 13h1v1h-1z" />
+
+  <path
+    fill="#885e38"
+    d="M4 10h1v1h-1zM4 11h3v1h-3zM4 12h5v1h-5zM4 13h7v1h-7zM4 14h8v1h-8zM4 15h8v1h-8zM5 16h7v1h-7zM7 17h5v1h-5zM9 18h3v1h-3zM11 19h1v1h-1z" />
+
+  <path
+    fill="#583c23"
+    d="M19 10h1v1h-1zM17 11h3v1h-3zM15 12h5v1h-5zM13 13h7v1h-7zM12 14h8v1h-8zM12 15h8v1h-8zM12 16h7v1h-7zM12 17h5v1h-5zM12 18h3v1h-3zM12 19h1v1h-1z" />
+</svg>

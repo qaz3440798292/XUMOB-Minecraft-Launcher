@@ -1,2 +1,379 @@
-.account-tabs{display:flex;gap:8px;border-bottom:1px solid #394d30;padding-bottom:14px;margin-bottom:20px}.account-tabs button{padding:10px 20px;border:1px solid #3c5039;border-radius:7px;color:#9eb18f;font-size:12px}.account-tabs button.selected{background:#2c3d2b;color:#d0e7b5;border-color:#687e50}.account-intro{font-size:12px;line-height:1.8;color:#a3b69a;margin:0 0 20px}.account-profile{display:flex;align-items:center;gap:12px;padding:16px;background:#162019;border:1px solid #394d30;border-radius:8px;margin-bottom:18px}.account-profile strong{display:block;font-size:15px}.account-profile small{display:block;font-size:10px;color:#91aa81;margin-top:5px}.account-profile button{margin-left:auto}.account-client-config{border:1px solid #344830;border-radius:8px;padding:12px 14px;margin-top:20px}.account-client-config summary{font-size:11px;color:#9cb08f;cursor:pointer}.account-client-config[open] summary{margin-bottom:15px}.account-client-config .input-action input{font-size:10px}.account-wait{display:flex;align-items:center;gap:8px;font-size:11px;color:#bbd59e;padding:14px;border:1px solid #394d30;border-radius:7px;background:#21321f}.account-wait>span:last-child{margin-left:auto;font-variant-numeric:tabular-nums}.account-login-url{overflow-wrap:anywhere}.account-storage-note{margin:18px 0 0}.account-error{border:1px solid #795447;background:#392821;color:#efb1a1;border-radius:7px;padding:12px 14px;font-size:12px;line-height:1.7;margin-top:16px}#microsoft-user-code{font-size:22px;letter-spacing:3px;font-weight:600;height:46px;color:#d5e9bc}#account-dialog{max-height:85vh;overflow-y:auto}
-.account-error{white-space:pre-line;user-select:text;overflow-wrap:anywhere}
+.account-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #394d30;
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+}
+.account-tabs button {
+  padding: 10px 20px;
+  border: 1px solid #3c5039;
+  border-radius: 7px;
+  color: #9eb18f;
+  font-size: 12px;
+}
+.account-tabs button.selected {
+  background: #2c3d2b;
+  color: #d0e7b5;
+  border-color: #687e50;
+}
+.account-intro {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #a3b69a;
+  margin: 0 0 20px;
+}
+.account-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #162019;
+  border: 1px solid #394d30;
+  border-radius: 8px;
+  margin-bottom: 18px;
+}
+.account-profile strong {
+  display: block;
+  font-size: 15px;
+}
+.account-profile small {
+  display: block;
+  font-size: 10px;
+  color: #91aa81;
+  margin-top: 5px;
+}
+.account-profile button {
+  margin-left: auto;
+}
+.account-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #bbd59e;
+  padding: 14px;
+  border: 1px solid #394d30;
+  border-radius: 7px;
+  background: #21321f;
+}
+.account-wait > span:last-child {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.account-login-url {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.account-storage-note {
+  margin: 18px 0 0;
+}
+.account-error {
+  border: 1px solid #795447;
+  background: #392821;
+  color: #efb1a1;
+  border-radius: 7px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 16px;
+}
+#microsoft-user-code {
+  font-size: 22px;
+  letter-spacing: 3px;
+  font-weight: 600;
+  height: 46px;
+  color: #d5e9bc;
+}
+#account-dialog {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.account-error {
+  white-space: pre-line;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.account-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(500px, calc(100vw - 18px));
+  height: 100vh;
+  max-height: none !important;
+  margin: 0 0 0 auto;
+  padding: 0;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px 0 0 14px;
+  border-right: 0;
+  animation: account-drawer-enter 180ms ease-out;
+}
+.account-drawer[open] {
+  display: flex;
+}
+.account-drawer::backdrop {
+  background: #07100bd9;
+  backdrop-filter: blur(3px);
+}
+.account-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 28px 28px 20px;
+  border-bottom: 1px solid #344830;
+  flex: 0 0 auto;
+}
+.account-drawer-header h2 {
+  margin: 0;
+  font-size: 23px;
+}
+.account-drawer-header .account-intro {
+  margin: 8px 0 0;
+}
+.account-drawer-header .eyebrow {
+  margin: 0 0 7px;
+  color: #9fc27c;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+.account-drawer-body {
+  overflow: auto;
+  padding: 22px 24px 30px;
+}
+.account-section {
+  margin-bottom: 20px;
+  padding: 18px;
+  border: 1px solid #344830;
+  border-radius: 11px;
+  background: #17231a;
+}
+.account-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 13px;
+}
+.account-section-title h3,
+.account-form h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.account-section-title > span {
+  color: #90a784;
+  font-size: 11px;
+}
+.account-empty {
+  padding: 19px 10px;
+  color: #91a18b;
+  text-align: center;
+  font-size: 12px;
+}
+.saved-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 66px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+.saved-account + .saved-account {
+  margin-top: 5px;
+}
+.saved-account.active {
+  background: #233522;
+  border-color: #536c41;
+}
+.saved-account-info {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.saved-account-info strong {
+  overflow: hidden;
+  color: #e3ebdf;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-account-info span,
+.saved-account-info small {
+  overflow: hidden;
+  color: #9aab94;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.saved-account-info small {
+  color: #b9d99a;
+}
+.saved-account button {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+.account-switch {
+  padding: 7px 10px;
+}
+.account-remove {
+  color: #c58b7c;
+  padding: 7px 5px;
+}
+.add-account-section {
+  padding-bottom: 10px;
+}
+.account-method {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  padding: 12px 8px;
+  border-top: 1px solid #2d3e2d;
+  text-align: left;
+}
+.account-method:hover {
+  background: #202e22;
+}
+.account-method > span:nth-child(2) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+.account-method strong {
+  font-size: 12px;
+}
+.account-method small {
+  color: #90a18a;
+  font-size: 10px;
+}
+.account-method > b {
+  color: #abc98c;
+  font-size: 18px;
+  font-weight: 400;
+}
+.account-method-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #465e3a;
+  border-radius: 9px;
+  background: #253824;
+  color: #b9d99a;
+  font-weight: 700;
+}
+.account-back {
+  margin: 0 0 16px;
+  color: #b4d88e;
+  font-size: 12px;
+}
+.account-form {
+  padding: 22px;
+}
+.account-form > .account-intro {
+  margin: 9px 0 20px;
+}
+.account-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 16px;
+  color: #a5b899;
+  font-size: 11px;
+}
+.account-form input {
+  width: 100%;
+  min-height: 43px;
+  padding: 10px 12px;
+  border: 1px solid #3b5035;
+  border-radius: 8px;
+  background: #111c15;
+  color: #e5eee0;
+}
+.account-fixed-api {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 17px;
+  padding: 12px;
+  border: 1px solid #344830;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.account-fixed-api span,
+.account-fixed-api small {
+  color: #91a784;
+}
+.account-fixed-api strong {
+  overflow-wrap: anywhere;
+  color: #d5e8c2;
+  font-size: 11px;
+}
+.account-form .dialog-actions {
+  margin-top: 20px;
+}
+.account-hint {
+  color: #a4b693;
+  font-size: 11px;
+}
+.microsoft-login {
+  margin-top: 18px;
+}
+.microsoft-device {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 12px;
+  border: 1px solid #3a5034;
+  border-radius: 9px;
+  background: #1e2c20;
+  color: #a5b899;
+  font-size: 12px;
+}
+.microsoft-device a {
+  color: #badb9d;
+}
+.device-code {
+  color: #e2edda;
+  font-size: 25px;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+}
+.device-code small {
+  color: #9db58e;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+@keyframes account-drawer-enter {
+  from {
+    opacity: 0.75;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media (max-width: 560px) {
+  .account-drawer {
+    width: 100vw;
+    border-radius: 0;
+  }
+  .account-drawer-header {
+    padding: 22px 18px 16px;
+  }
+  .account-drawer-body {
+    padding: 16px 14px 24px;
+  }
+}

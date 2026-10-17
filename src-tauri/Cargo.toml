@@ -1,19 +1,19 @@
 [package]
-name = "blockfield-launcher"
-version = "0.5.0"
+name = "xumob-minecraft-launcher"
+version = "0.7.0"
 edition = "2021"
-default-run = "blockfield-launcher"
+default-run = "xumob-minecraft-launcher"
 
 [features]
 default = []
 custom-protocol = ["tauri/custom-protocol"]
 
 [lib]
-name = "blockfield_core"
+name = "xumob_core"
 path = "src/lib.rs"
 
 [[bin]]
-name = "blockfield-launcher"
+name = "xumob-minecraft-launcher"
 path = "src/main.rs"
 
 [[bin]]
@@ -33,16 +33,20 @@ sha1 = "0.10"
 sha2 = "0.10"
 md-5 = "0.10"
 hex = "0.4"
+base64 = "0.22.1"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 encoding_rs = "0.8"
 sysinfo = { version = "0.37", default-features = false, features = ["system"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "stream", "json"] }
 rfd = { version = "0.15", default-features = false, features = ["common-controls-v6"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+flate2 = "1"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "=0.39.1"
 windows-core = "0.62"
+windows = { version = "0.62", features = ["Security_Authentication_Web_Core", "Security_Credentials", "Win32_Foundation", "Win32_System_WinRT"] }
+windows-future = "0.3"
 
 [profile.release]
 opt-level = "s"

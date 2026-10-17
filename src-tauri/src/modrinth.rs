@@ -16,8 +16,11 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[path = "mod_updates.rs"]
+mod mod_updates;
+
 const API: &str = "https://api.modrinth.com/v2";
-const AGENT: &str = "XUMOB-Minecraft-Launcher/0.5.0";
+const AGENT: &str = "XUMOB-Minecraft-Launcher/0.7.0";
 const MAX_FILE: u64 = 512 * 1024 * 1024;
 const MAX_TOTAL: u64 = 2 * 1024 * 1024 * 1024;
 static SERIAL: AtomicU64 = AtomicU64::new(1);
@@ -46,6 +49,7 @@ fn kind_folder(kind: &str) -> R<&'static str> {
         "mod" => Ok("mods"),
         "resourcepack" => Ok("resourcepacks"),
         "shader" => Ok("shaderpacks"),
+        "modpack" => Ok("modpacks"),
         _ => Err("请选择模组、资源包或光影。".into()),
     }
 }
@@ -86,6 +90,143 @@ fn cdn_url(value: &str) -> R<reqwest::Url> {
         return Err("下载地址不是 Modrinth 官方文件源。".into());
     }
     Ok(url)
+}
+pub(crate) fn icon_url(value: &str) -> String {
+    cdn_url(value)
+        .or_else(|_| -> R<reqwest::Url> {
+            let url = crate::net::allowed(value)?;
+            if url.host_str().unwrap_or("").ends_with(".forgecdn.net") {
+                Ok(url)
+            } else {
+                Err("图标来源无效。".into())
+            }
+        })
+        .map(|url| url.to_string())
+        .unwrap_or_default()
+}
+fn public_link(value: &str) -> Option<String> {
+    let url = reqwest::Url::parse(value).ok()?;
+    (url.scheme() == "https"
+        && url.host_str().is_some()
+        && url.port().is_none()
+        && url.username().is_empty()
+        && url.password().is_none())
+    .then(|| url.to_string())
+}
+#[derive(Default, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BrowseFilters {
+    game_version: String,
+    loader: String,
+    category: String,
+}
+impl BrowseFilters {
+    fn parse(value: &Value, kind: &str) -> R<Self> {
+        kind_folder(kind)?;
+        if !value.is_null() && !value.is_object() {
+            return Err("下载筛选条件无效。".into());
+        }
+        let read = |key: &str| -> R<String> {
+            match value.get(key) {
+                None | Some(Value::Null) => Ok(String::new()),
+                Some(Value::String(s)) => Ok(s.clone()),
+                _ => Err("下载筛选条件必须是文本。".into()),
+            }
+        };
+        let filters = Self {
+            game_version: read("gameVersion")?,
+            loader: read("loader")?,
+            category: read("category")?,
+        };
+        if !valid_game_version(&filters.game_version) {
+            return Err("游戏版本筛选无效。".into());
+        }
+        if !filters.loader.is_empty() && !supported_loader(&filters.loader, kind) {
+            return Err("模组加载器筛选与内容类型不匹配。".into());
+        }
+        if !valid_category(&filters.category) {
+            return Err("内容分类筛选无效。".into());
+        }
+        Ok(filters)
+    }
+    fn from_context(context: Option<&Context>, kind: &str) -> Value {
+        match context {
+            Some(ctx) => {
+                json!({"gameVersion":ctx.minecraft,"loader":if kind == "mod" && ctx.loader != "minecraft" {ctx.loader.as_str()} else {""}})
+            }
+            None => json!({}),
+        }
+    }
+    fn matches_version(&self, version: &Value) -> bool {
+        (self.game_version.is_empty() || contains(&version["game_versions"], &self.game_version))
+            && (self.loader.is_empty() || contains(&version["loaders"], &self.loader))
+    }
+}
+fn valid_game_version(value: &str) -> bool {
+    value.len() <= 64
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b))
+}
+fn valid_category(value: &str) -> bool {
+    value.len() <= 64
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"-_".contains(&b))
+}
+fn supported_loader(loader: &str, kind: &str) -> bool {
+    match kind {
+        "mod" | "modpack" => ["fabric", "forge", "neoforge", "quilt"].contains(&loader),
+        "shader" => ["iris", "optifine"].contains(&loader),
+        "resourcepack" => loader == "minecraft",
+        _ => false,
+    }
+}
+fn version_view(version: &Value) -> Value {
+    json!({
+        "id":version["id"],"name":version["name"],"number":version["version_number"],
+        "channel":version["version_type"],"date":version["date_published"],
+        "loaders":version["loaders"],"gameVersions":version["game_versions"],
+        "environment":version["environment"],
+        "downloads":version["downloads"],
+        "size":items(&version["files"]).iter().find(|f| f["primary"]==true)
+            .or_else(|| items(&version["files"]).first()).map(|f|f["size"].clone())
+    })
+}
+fn project_view(project: &Value, kind: &str, versions: &[Value]) -> Value {
+    let mut links = serde_json::Map::new();
+    for (key, source) in [
+        ("issues", "issues_url"),
+        ("source", "source_url"),
+        ("wiki", "wiki_url"),
+        ("discord", "discord_url"),
+    ] {
+        if let Some(link) = public_link(field(project, source)) {
+            links.insert(key.into(), json!(link));
+        }
+    }
+    let supported = |key: &str| -> Value {
+        if project[key].is_array() {
+            return project[key].clone();
+        }
+        let mut values = versions
+            .iter()
+            .flat_map(|v| items(&v[key]).iter())
+            .filter_map(Value::as_str)
+            .collect::<Vec<_>>();
+        values.sort_unstable();
+        values.dedup();
+        json!(values)
+    };
+    json!({
+        "id":project["id"],"title":project["title"],"description":project["description"],"kind":kind,
+        "body":field(project,"body"),"iconUrl":icon_url(field(project,"icon_url")),
+        "slug":project["slug"],"downloads":project["downloads"],"followers":project["followers"],
+        "clientSide":project["client_side"],
+        "gameVersions":supported("game_versions"),"loaders":supported("loaders"),
+        "license":{"id":project["license"]["id"],"name":project["license"]["name"],"url":public_link(field(&project["license"],"url"))},
+        "links":links
+    })
 }
 fn hex_hash(value: &str, len: usize) -> bool {
     value.len() == len && value.bytes().all(|b| b.is_ascii_hexdigit())
@@ -144,7 +285,22 @@ impl Context {
             }
     }
 }
-trait Transport: Send + Sync {
+pub(crate) trait Transport: Send + Sync {
+    fn allow_sha1(&self) -> bool {
+        false
+    }
+    fn identify(&self, files: &HashMap<String, PathBuf>) -> R<Value> {
+        let mut result = serde_json::Map::new();
+        for chunk in files.keys().cloned().collect::<Vec<_>>().chunks(100) {
+            let v = self.api(
+                "/version_files",
+                &[],
+                Some(json!({"hashes":chunk,"algorithm":"sha1"})),
+            )?;
+            result.extend(v.as_object().ok_or("文件识别响应无效。")?.clone());
+        }
+        Ok(Value::Object(result))
+    }
     fn api(&self, route: &str, query: &[(String, String)], body: Option<Value>) -> R<Value>;
     fn download(
         &self,
@@ -269,18 +425,19 @@ impl Transport for Network {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ContentFile {
-    project_id: String,
-    version_id: String,
-    title: String,
-    filename: String,
-    folder: String,
-    size: u64,
-    sha512: String,
-    sha1: String,
-    dependency: bool,
+pub(crate) struct ContentFile {
+    pub(crate) project_id: String,
+    pub(crate) version_id: String,
+    pub(crate) title: String,
+    pub(crate) filename: String,
+    pub(crate) folder: String,
+    pub(crate) size: u64,
+    pub(crate) sha512: String,
+    pub(crate) sha1: String,
+    pub(crate) dependency: bool,
+    pub(crate) dependency_depth: usize,
     #[serde(skip)]
-    url: String,
+    pub(crate) url: String,
 }
 #[derive(Clone)]
 struct Ticket {
@@ -297,17 +454,54 @@ struct Installed {
 pub struct Manager {
     http: Arc<dyn Transport>,
     tickets: Mutex<HashMap<String, Ticket>>,
+    update_candidates: Mutex<HashMap<String, mod_updates::Candidate>>,
     cache: Mutex<HashMap<String, (Instant, Value, usize)>>,
     cancelled: AtomicBool,
 }
 impl Manager {
+    pub(crate) fn identify_metadata(&self, files: &HashMap<String, PathBuf>) -> R<Value> {
+        let identified = self.http.identify(files)?;
+        let map = identified
+            .as_object()
+            .ok_or("Modrinth 文件识别响应无效。")?;
+        let mut ids = map
+            .values()
+            .map(|v| field(v, "project_id").to_owned())
+            .filter(|id| !id.is_empty())
+            .collect::<Vec<_>>();
+        ids.sort();
+        ids.dedup();
+        let mut projects = HashMap::new();
+        for chunk in ids.chunks(100) {
+            let response = self.get("/projects", vec![("ids".into(), json!(chunk).to_string())])?;
+            for project in items(&response) {
+                projects.insert(field(project, "id").to_owned(), project.clone());
+            }
+        }
+        let mut result = serde_json::Map::new();
+        for (hash, version) in map {
+            let id = field(version, "project_id");
+            if let Some(project) = projects.get(id) {
+                result.insert(
+                    hash.clone(),
+                    json!({
+                        "id": id,
+                        "title": project["title"],
+                        "iconUrl": icon_url(field(project, "icon_url")),
+                    }),
+                );
+            }
+        }
+        Ok(Value::Object(result))
+    }
     pub fn new() -> R<Arc<Self>> {
         Ok(Self::with_transport(Arc::new(Network::new()?)))
     }
-    fn with_transport(http: Arc<dyn Transport>) -> Arc<Self> {
+    pub(crate) fn with_transport(http: Arc<dyn Transport>) -> Arc<Self> {
         Arc::new(Self {
             http,
             tickets: Mutex::new(HashMap::new()),
+            update_candidates: Mutex::new(HashMap::new()),
             cache: Mutex::new(HashMap::new()),
             cancelled: AtomicBool::new(false),
         })
@@ -341,19 +535,40 @@ impl Manager {
         sort: &str,
         context: Option<&Context>,
     ) -> R<Value> {
-        kind_folder(kind)?;
+        self.search_filtered(
+            query,
+            kind,
+            offset,
+            sort,
+            &BrowseFilters::from_context(context, kind),
+            context,
+        )
+    }
+    pub fn search_filtered(
+        &self,
+        query: &str,
+        kind: &str,
+        offset: u32,
+        sort: &str,
+        filters: &Value,
+        context: Option<&Context>,
+    ) -> R<Value> {
+        let filters = BrowseFilters::parse(filters, kind)?;
         if query.chars().count() > 120 || offset > 10000 {
             return Err("搜索范围过大。".into());
         }
-        if !["relevance", "downloads", "updated", "newest"].contains(&sort) {
+        if !["relevance", "downloads", "follows", "updated", "newest"].contains(&sort) {
             return Err("排序方式无效。".into());
         }
         let mut facets = vec![vec![format!("project_type:{kind}")]];
-        if let Some(ctx) = context {
-            facets.push(vec![format!("versions:{}", ctx.minecraft)]);
-            if kind == "mod" && ctx.loader != "minecraft" {
-                facets.push(vec![format!("categories:{}", ctx.loader)]);
-            }
+        if !filters.game_version.is_empty() {
+            facets.push(vec![format!("versions:{}", filters.game_version)]);
+        }
+        if !filters.loader.is_empty() {
+            facets.push(vec![format!("categories:{}", filters.loader)]);
+        }
+        if !filters.category.is_empty() {
+            facets.push(vec![format!("categories:{}", filters.category)]);
         }
         let result = self.get(
             "/search",
@@ -365,16 +580,16 @@ impl Manager {
                 ("limit".into(), "20".into()),
             ],
         )?;
-        let hits = items(&result["hits"]).iter().map(|v| json!({"id":v["project_id"],"title":v["title"],"description":v["description"],"author":v["author"],"downloads":v["downloads"],"categories":v["categories"],"kind":kind})).collect::<Vec<_>>();
+        let hits = items(&result["hits"]).iter().map(|v| json!({"id":v["project_id"],"title":v["title"],"description":v["description"],"author":v["author"],"downloads":v["downloads"],"categories":v["categories"],"kind":kind,"iconUrl":icon_url(field(v,"icon_url")),"slug":v["slug"],"gameVersions":v["versions"]})).collect::<Vec<_>>();
         Ok(
-            json!({"hits":hits,"total":result["total_hits"],"offset":offset,"limit":20,"context":context}),
+            json!({"hits":hits,"total":result["total_hits"],"offset":offset,"limit":20,"context":context,"filters":filters}),
         )
     }
-    fn project(&self, id: &str) -> R<Value> {
+    pub(crate) fn project(&self, id: &str) -> R<Value> {
         identifier(id)?;
         self.get(&format!("/project/{id}"), vec![])
     }
-    fn raw_version(&self, id: &str) -> R<Value> {
+    pub(crate) fn raw_version(&self, id: &str) -> R<Value> {
         identifier(id)?;
         self.get(&format!("/version/{id}"), vec![])
     }
@@ -408,10 +623,78 @@ impl Manager {
         if field(&project, "project_type") != kind {
             return Err("项目类型与选择的下载类型不一致。".into());
         }
-        let versions = self.raw_versions(id, kind, context)?.into_iter().take(100).map(|v| json!({"id":v["id"],"name":v["name"],"number":v["version_number"],"channel":v["version_type"],"date":v["date_published"],"loaders":v["loaders"],"gameVersions":v["game_versions"],"size":items(&v["files"]).iter().find(|f| f["primary"]==true).or_else(|| items(&v["files"]).first()).map(|f|f["size"].clone())})).collect::<Vec<_>>();
+        let raw = self.raw_versions(id, kind, context)?;
+        let versions = raw.iter().map(version_view).collect::<Vec<_>>();
         Ok(
-            json!({"project":{"id":project["id"],"title":project["title"],"description":project["description"],"kind":kind},"versions":versions,"context":context}),
+            json!({"project":project_view(&project,kind,&raw),"versions":versions,"context":context}),
         )
+    }
+    pub fn versions_filtered(
+        &self,
+        id: &str,
+        kind: &str,
+        filters: &Value,
+        context: Option<&Context>,
+    ) -> R<Value> {
+        let filters = BrowseFilters::parse(filters, kind)?;
+        let project = self.project(id)?;
+        if field(&project, "project_type") != kind {
+            return Err("项目类型与选择的下载类型不一致。".into());
+        }
+        let mut query = vec![("include_changelog".into(), "false".into())];
+        if !filters.game_version.is_empty() {
+            query.push((
+                "game_versions".into(),
+                json!([filters.game_version]).to_string(),
+            ));
+        }
+        if !filters.loader.is_empty() {
+            query.push(("loaders".into(), json!([filters.loader]).to_string()));
+        }
+        let result = self.get(&format!("/project/{id}/version"), query)?;
+        let mut raw = result.as_array().ok_or("Modrinth 版本列表无效。")?.clone();
+        raw.retain(|version| filters.matches_version(version));
+        raw.sort_by(|a, b| field(b, "date_published").cmp(field(a, "date_published")));
+        Ok(
+            json!({"project":project_view(&project,kind,&raw),"versions":raw.iter().map(version_view).collect::<Vec<_>>(),"context":context,"filters":filters}),
+        )
+    }
+    pub fn catalog(&self) -> R<Value> {
+        let game_versions = self.get("/tag/game_version", vec![])?;
+        let loaders = self.get("/tag/loader", vec![])?;
+        let categories = self.get("/tag/category", vec![])?;
+        if !game_versions.is_array() || !loaders.is_array() || !categories.is_array() {
+            return Err("Modrinth 筛选列表无效。".into());
+        }
+        let mut game_versions = items(&game_versions).iter()
+            .filter(|v| !field(v,"version").is_empty() && valid_game_version(field(v,"version")))
+            .map(|v| json!({"version":v["version"],"type":v["version_type"],"date":v["date"],"major":v["major"]}))
+            .collect::<Vec<_>>();
+        game_versions.sort_by(|a, b| field(b, "date").cmp(field(a, "date")));
+        let loaders = items(&loaders)
+            .iter()
+            .filter_map(|v| {
+                let project_types = ["mod", "resourcepack", "shader"]
+                    .into_iter()
+                    .filter(|kind| {
+                        supported_loader(field(v, "name"), kind)
+                            && contains(&v["supported_project_types"], kind)
+                    })
+                    .collect::<Vec<_>>();
+                (!project_types.is_empty())
+                    .then(|| json!({"name":v["name"],"projectTypes":project_types}))
+            })
+            .collect::<Vec<_>>();
+        let categories = items(&categories)
+            .iter()
+            .filter(|v| {
+                !field(v, "name").is_empty()
+                    && valid_category(field(v, "name"))
+                    && kind_folder(field(v, "project_type")).is_ok()
+            })
+            .map(|v| json!({"name":v["name"],"kind":v["project_type"],"header":v["header"]}))
+            .collect::<Vec<_>>();
+        Ok(json!({"gameVersions":game_versions,"loaders":loaders,"categories":categories}))
     }
     fn installed(&self, context: &Context, cancellable: bool) -> R<HashMap<String, Installed>> {
         let mut by_hash = HashMap::new();
@@ -463,16 +746,18 @@ impl Manager {
             }
         }
         let mut installed: HashMap<String, Installed> = HashMap::new();
-        let hashes = by_hash.keys().cloned().collect::<Vec<_>>();
-        for chunk in hashes.chunks(100) {
-            if cancellable && self.cancelled.load(Ordering::Relaxed) {
-                return Err("下载已取消。".into());
-            }
-            let result = self.http.api(
-                "/version_files",
-                &[],
-                Some(json!({"hashes":chunk,"algorithm":"sha1"})),
-            )?;
+        let paths = by_hash
+            .iter()
+            .filter_map(|(hash, name)| {
+                ["mods", "resourcepacks", "shaderpacks"]
+                    .into_iter()
+                    .map(|folder| context.game_dir.join(folder).join(name))
+                    .find(|p| p.is_file())
+                    .map(|p| (hash.clone(), p))
+            })
+            .collect();
+        let result = self.http.identify(&paths)?;
+        {
             let map = result.as_object().ok_or("Modrinth 文件识别响应无效。")?;
             for (hash, version) in map {
                 if let Some(name) = by_hash.get(hash) {
@@ -499,6 +784,9 @@ impl Manager {
         Ok(installed)
     }
     pub fn prepare(&self, id: &str, version_id: &str, kind: &str, context: Context) -> R<Value> {
+        if kind == "modpack" {
+            return Err("整合包应安装为新游戏实例。".into());
+        }
         identifier(id)?;
         identifier(version_id)?;
         kind_folder(kind)?;
@@ -522,7 +810,7 @@ impl Manager {
             incompatible: vec![],
             visiting: HashSet::new(),
         };
-        resolver.visit(version, kind, false)?;
+        resolver.visit(version, kind, 0)?;
         for dep in &resolver.incompatible {
             let project = field(dep, "project_id");
             let version = field(dep, "version_id");
@@ -579,7 +867,12 @@ impl Manager {
     pub(crate) fn reset_cancellation(&self) {
         self.cancelled.store(false, Ordering::Relaxed);
     }
-    fn install(&self, id: &str, context: Context, progress: &mut dyn FnMut(Value)) -> R<Value> {
+    pub(crate) fn install(
+        &self,
+        id: &str,
+        context: Context,
+        progress: &mut dyn FnMut(Value),
+    ) -> R<Value> {
         let ticket = self
             .tickets
             .lock()
@@ -650,10 +943,15 @@ impl Manager {
                 .map_err(|_| "无法创建下载临时文件。")?;
             staged.temporary.push((temp.clone(), target));
             let mut last = Instant::now() - Duration::from_secs(1);
-            self.http.download(file, &mut out, &self.cancelled, &mut |bytes| { if last.elapsed() >= Duration::from_millis(120) || bytes == file.size { progress(json!({"filename":file.filename,"bytes":completed+bytes,"totalBytes":total,"fileIndex":index+1,"fileCount":ticket.files.len()})); last = Instant::now(); } })?;
+            self.http.download(file, &mut out, &self.cancelled, &mut |bytes| { if last.elapsed() >= Duration::from_millis(120) || bytes == file.size { progress(json!({"filename":file.filename,"bytes":completed+bytes,"totalBytes":total,"fileIndex":index+1,"fileCount":ticket.files.len(),"unit":"bytes"})); last = Instant::now(); } })?;
             out.sync_all().map_err(|_| "无法保存下载文件。")?;
             drop(out);
-            if file_hash(&temp, true)? != file.sha512
+            if file_hash(&temp, !file.sha512.is_empty())?
+                != if file.sha512.is_empty() {
+                    file.sha1.clone()
+                } else {
+                    file.sha512.clone()
+                }
                 || fs::metadata(&temp).map_err(|_| "下载文件丢失。")?.len() != file.size
             {
                 return Err(format!("{} 校验失败，未安装任何新文件。", file.filename));
@@ -691,7 +989,7 @@ struct Resolver<'a> {
     visiting: HashSet<String>,
 }
 impl Resolver<'_> {
-    fn visit(&mut self, version: Value, kind: &str, dependency: bool) -> R<()> {
+    fn visit(&mut self, version: Value, kind: &str, dependency_depth: usize) -> R<()> {
         let id = field(&version, "id").to_string();
         let project_id = field(&version, "project_id").to_string();
         identifier(&id)?;
@@ -733,14 +1031,20 @@ impl Resolver<'_> {
             .ok_or("该版本没有可下载文件。")?;
         let filename = field(file, "filename");
         safe_filename(filename, kind)?;
-        cdn_url(field(file, "url"))?;
+        if field(file, "url").is_empty() {
+            return Err("作者未允许第三方下载该文件，请前往平台项目页。".into());
+        }
+        crate::net::allowed(field(file, "url"))?;
         let size = file["size"]
             .as_u64()
             .filter(|n| *n > 0 && *n <= MAX_FILE)
             .ok_or("文件大小超出支持范围（单文件最大 512 MB）。")?;
         let sha512 = field(&file["hashes"], "sha512").to_ascii_lowercase();
         let sha1 = field(&file["hashes"], "sha1").to_ascii_lowercase();
-        if !hex_hash(&sha512, 128) || !hex_hash(&sha1, 40) {
+        if (!self.manager.http.allow_sha1() && sha512.is_empty())
+            || (!sha512.is_empty() && !hex_hash(&sha512, 128))
+            || !hex_hash(&sha1, 40)
+        {
             return Err("文件缺少有效的 Modrinth 校验信息。".into());
         }
         self.projects.insert(project_id.clone(), id.clone());
@@ -754,7 +1058,8 @@ impl Resolver<'_> {
             sha512,
             sha1,
             url: field(file, "url").into(),
-            dependency,
+            dependency: dependency_depth > 0,
+            dependency_depth,
         });
         for dep in items(&version["dependencies"]) {
             match field(dep, "dependency_type") {
@@ -794,7 +1099,7 @@ impl Resolver<'_> {
                     }
                     let project = self.manager.project(field(&next, "project_id"))?;
                     let next_kind = field(&project, "project_type").to_string();
-                    self.visit(next, &next_kind, true)?;
+                    self.visit(next, &next_kind, dependency_depth + 1)?;
                 }
                 _ => {}
             }
@@ -833,7 +1138,12 @@ fn check_destination(path: &Path, file: &ContentFile) -> R<bool> {
             if meta.is_file()
                 && !meta.file_type().is_symlink()
                 && meta.len() == file.size
-                && file_hash(path, true)? == file.sha512 =>
+                && file_hash(path, !file.sha512.is_empty())?
+                    == if file.sha512.is_empty() {
+                        file.sha1.clone()
+                    } else {
+                        file.sha512.clone()
+                    } =>
         {
             Ok(true)
         }
@@ -906,6 +1216,26 @@ impl Service {
     pub fn modrinth_versions(&self, id: &str, kind: &str) -> R<Value> {
         let context = Context::from_settings(&self.settings()).ok();
         self.modrinth.versions(id, kind, context.as_ref())
+    }
+    pub fn modrinth_search_filtered(
+        &self,
+        query: &str,
+        kind: &str,
+        offset: u32,
+        sort: &str,
+        filters: &Value,
+    ) -> R<Value> {
+        let context = Context::from_settings(&self.settings()).ok();
+        self.modrinth
+            .search_filtered(query, kind, offset, sort, filters, context.as_ref())
+    }
+    pub fn modrinth_versions_filtered(&self, id: &str, kind: &str, filters: &Value) -> R<Value> {
+        let context = Context::from_settings(&self.settings()).ok();
+        self.modrinth
+            .versions_filtered(id, kind, filters, context.as_ref())
+    }
+    pub fn modrinth_catalog(&self) -> R<Value> {
+        self.modrinth.catalog()
     }
     pub fn modrinth_prepare(&self, id: &str, version: &str, kind: &str) -> R<Value> {
         self.ensure_account_editable()?;
